@@ -1,47 +1,106 @@
-import { Link } from "react-router-dom";
-import { GraduationCap } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { GraduationCap, User } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useAuth } from "@/contexts/AuthContext";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
-const Navbar = () => {
+export default function Navbar() {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const userRole = localStorage.getItem('userRole');
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/login');
+    } catch (error) {
+      console.error('Error logging out:', error);
+    }
+  };
+
+  const getProfileLink = () => {
+    switch (userRole) {
+      case 'admin':
+        return '/admin/profile';
+      case 'teacher':
+        return '/teacher/profile';
+      case 'student':
+        return '/student/profile';
+      default:
+        return '/complete-profile';
+    }
+  };
+
+  const getDashboardLink = () => {
+    switch (userRole) {
+      case 'admin':
+        return '/admin/dashboard';
+      case 'teacher':
+        return '/teacher/dashboard';
+      case 'student':
+        return '/student/dashboard';
+      default:
+        return '/complete-profile';
+    }
+  };
+
   return (
-    <nav className="fixed top-0 left-0 right-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-50 transition-all duration-200">
-      <div className="container mx-auto px-4">
+    <header className="fixed top-0 left-0 right-0 z-50 bg-background border-b">
+      <nav className="container mx-auto px-4">
         <div className="flex justify-between items-center h-16">
           <Link to="/" className="flex items-center gap-2 text-2xl font-bold">
             <GraduationCap className="h-8 w-8 text-primary" />
-            <span className="bg-gradient-to-r from-primary to-primary-light bg-clip-text text-transparent">
-              EduXa
-            </span>
+            <span>Eduxa</span>
           </Link>
-          <div className="flex gap-6">
-            <Link
-              to="/"
-              className="text-foreground/80 hover:text-foreground transition-colors text-sm font-medium"
-            >
-              Início
-            </Link>
-            <Link
-              to="/courses"
-              className="text-foreground/80 hover:text-foreground transition-colors text-sm font-medium"
-            >
+
+          <div className="flex items-center gap-4">
+            <Link to="/courses" className="text-sm font-medium hover:text-primary">
               Cursos
             </Link>
-            <Link
-              to="/login"
-              className="text-foreground/80 hover:text-foreground transition-colors text-sm font-medium"
-            >
-              Entrar
-            </Link>
-            <Link
-              to="/register"
-              className="text-primary hover:text-primary-light transition-colors text-sm font-medium"
-            >
-              Criar Conta
-            </Link>
+            
+            {user ? (
+              <>
+                <Link to={getDashboardLink()} className="text-sm font-medium hover:text-primary">
+                  Dashboard
+                </Link>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon">
+                      <User className="h-5 w-5" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem asChild>
+                      <Link to={getProfileLink()}>Perfil</Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleLogout}>
+                      Sair
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </>
+            ) : (
+              <>
+                <Link to="/login">
+                  <Button variant="ghost">Entrar</Button>
+                </Link>
+                <Link to="/register">
+                  <Button>Criar Conta</Button>
+                </Link>
+              </>
+            )}
           </div>
         </div>
-      </div>
-    </nav>
+      </nav>
+    </header>
   );
-};
-
-export default Navbar;
+}

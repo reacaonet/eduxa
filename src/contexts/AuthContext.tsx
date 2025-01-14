@@ -7,9 +7,14 @@ import {
   onAuthStateChanged,
   GoogleAuthProvider,
   signInWithPopup,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
+  setPersistence,
+  browserLocalPersistence,
+  browserSessionPersistence
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 interface AuthContextType {
   user: User | null;
@@ -36,23 +41,59 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
-      setLoading(false);
-    });
+    const rememberMe = localStorage.getItem('rememberMe') === 'true';
+    setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence)
+      .then(() => {
+        const unsubscribe = onAuthStateChanged(auth, async (user) => {
+          setUser(user);
+          if (user) {
+            try {
+              const userRef = doc(db, 'users', user.uid);
+              const userSnap = await getDoc(userRef);
+              if (userSnap.exists()) {
+                const userData = userSnap.data();
+                localStorage.setItem('userRole', userData.role);
+              } else {
+                localStorage.removeItem('userRole');
+              }
+            } catch (error) {
+              console.error('Error fetching user data:', error);
+              localStorage.removeItem('userRole');
+            }
+          } else {
+            localStorage.removeItem('userRole');
+          }
+          setLoading(false);
+        });
 
-    return () => unsubscribe();
+        return () => unsubscribe();
+      })
+      .catch((error) => {
+        console.error('Error setting persistence:', error);
+        setLoading(false);
+      });
   }, []);
 
   const signIn = async (email: string, password: string, rememberMe = false) => {
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
       if (rememberMe) {
-        // Configurar persistência local se rememberMe for true
         localStorage.setItem('rememberMe', 'true');
       } else {
         localStorage.removeItem('rememberMe');
       }
+
+      const userRef = doc(db, 'users', userCredential.user.uid);
+      const userSnap = await getDoc(userRef);
+      if (userSnap.exists()) {
+        const userData = userSnap.data();
+        localStorage.setItem('userRole', userData.role);
+      } else {
+        localStorage.removeItem('userRole');
+      }
+
+      return userCredential;
     } catch (error) {
       console.error('Error signing in:', error);
       throw error;
@@ -62,7 +103,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const signInWithGoogle = async () => {
     try {
       const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
+      const result = await signInWithPopup(auth, provider);
+      const userRef = doc(db, 'users', result.user.uid);
+      const userSnap = await getDoc(userRef);
+      
+      if (userSnap.exists()) {
+        const userData = userSnap.data();
+        localStorage.setItem('userRole', userData.role);
+      } else {
+        localStorage.removeItem('userRole');
+      }
+
+      return result;
     } catch (error) {
       console.error('Error signing in with Google:', error);
       throw error;
@@ -71,7 +123,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signUp = async (email: string, password: string) => {
     try {
-      await createUserWithEmailAndPassword(auth, email, password);
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      return userCredential;
     } catch (error) {
       console.error('Error signing up:', error);
       throw error;
@@ -81,6 +134,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const logout = async () => {
     try {
       await signOut(auth);
+      localStorage.removeItem('userRole');
       localStorage.removeItem('rememberMe');
     } catch (error) {
       console.error('Error signing out:', error);
@@ -104,12 +158,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     signInWithGoogle,
     signUp,
     logout,
-    resetPassword
+    resetPassword,
   };
 
   return (
     <AuthContext.Provider value={value}>
-      {!loading && children}
+      {children}
     </AuthContext.Provider>
   );
 };
