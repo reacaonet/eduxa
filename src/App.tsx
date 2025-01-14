@@ -22,6 +22,7 @@ import CourseLearn from "@/pages/CourseLearn";
 import ManageUsers from "@/pages/admin/ManageUsers";
 import UserList from "@/pages/admin/UserList";
 import CourseList from "@/pages/admin/CourseList";
+import CreateCourse from "@/pages/admin/CreateCourse";
 
 const queryClient = new QueryClient();
 
@@ -117,6 +118,14 @@ function App() {
                   element={
                     <ProtectedRoute requiredRole="admin">
                       <CourseList />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/courses/new"
+                  element={
+                    <ProtectedRoute requiredRole="admin">
+                      <CreateCourse />
                     </ProtectedRoute>
                   }
                 />

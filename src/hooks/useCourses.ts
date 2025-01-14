@@ -25,7 +25,7 @@ interface UseCoursesReturn {
   error: string | null;
   hasMore: boolean;
   loadMore: () => Promise<void>;
-  updateCourse: (courseId: string, data: Partial<Course>) => Promise<void>;
+  updateCourse: (courseId: string, data: Partial<Course>) => Promise<boolean>;
   filterCourses: (category?: string, status?: string, search?: string) => Promise<void>;
   totalCourses: number;
 }
@@ -104,19 +104,59 @@ export function useCourses({ pageSize = 10 }: UseCoursesOptions = {}): UseCourse
   const updateCourse = async (courseId: string, data: Partial<Course>) => {
     try {
       const courseRef = doc(db, "courses", courseId);
-      await updateDoc(courseRef, {
-        ...data,
+      
+      // Processar campos especiais
+      const processedData: Record<string, any> = {
         updatedAt: new Date(),
-      });
+      };
 
-      setCourses((prev) =>
-        prev.map((course) =>
-          course.id === courseId ? { ...course, ...data } : course
-        )
-      );
-    } catch (err) {
-      console.error("Error updating course:", err);
-      throw new Error("Erro ao atualizar curso");
+      // Processar apenas campos que existem no data
+      if (data.title) processedData.title = data.title;
+      if (data.description) processedData.description = data.description;
+      if (data.shortDescription) processedData.shortDescription = data.shortDescription;
+      if (data.category) processedData.category = data.category;
+      if (data.subcategory) processedData.subcategory = data.subcategory;
+      if (data.price) processedData.price = parseFloat(data.price.toString());
+      if (data.image) processedData.image = data.image;
+      if (data.status) processedData.status = data.status;
+      if (data.duration) processedData.duration = data.duration;
+      if (data.level) processedData.level = data.level;
+      if (data.language) processedData.language = data.language;
+      if (data.supportEmail) processedData.supportEmail = data.supportEmail;
+      
+      // Processar arrays e campos especiais apenas se existirem
+      if (data.prerequisites) {
+        processedData.prerequisites = typeof data.prerequisites === 'string' 
+          ? data.prerequisites.split('\n').filter(Boolean)
+          : data.prerequisites;
+      }
+      
+      if (data.learningObjectives) {
+        processedData.learningObjectives = typeof data.learningObjectives === 'string'
+          ? data.learningObjectives.split('\n').filter(Boolean)
+          : data.learningObjectives;
+      }
+      
+      if (data.tags) {
+        processedData.tags = typeof data.tags === 'string'
+          ? data.tags.split(',').map(tag => tag.trim()).filter(Boolean)
+          : data.tags;
+      }
+
+      // Tratar o certificateAvailable como booleano
+      if (data.certificateAvailable !== undefined) {
+        processedData.certificateAvailable = data.certificateAvailable === 'on' || data.certificateAvailable === true;
+      }
+
+      await updateDoc(courseRef, processedData);
+      
+      // Atualizar o cache do React Query
+      // queryClient.invalidateQueries(['courses']);
+      
+      return true;
+    } catch (error) {
+      console.error('Error updating course:', error);
+      throw error;
     }
   };
 

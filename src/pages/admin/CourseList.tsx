@@ -10,6 +10,23 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/components/ui/use-toast";
+import { Loader2, Search, Settings, Plus } from "lucide-react";
+import { Link } from "react-router-dom";
+import { useCourses } from "@/hooks/useCourses";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
   Table,
   TableBody,
   TableCell,
@@ -17,25 +34,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
-import { useToast } from "@/components/ui/use-toast";
-import { Loader2, Search, Settings, Plus } from "lucide-react";
-import { Link } from "react-router-dom";
-import { useCourses } from "@/hooks/useCourses";
 
 export default function CourseList() {
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
-  const [modalOpen, setModalOpen] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const { courses, loading, error, hasMore, loadMore, updateCourse, filterCourses, totalCourses } = useCourses();
   const { toast } = useToast();
 
@@ -44,14 +49,21 @@ export default function CourseList() {
     filterCourses(categoryFilter, statusFilter, searchTerm);
   };
 
-  const handleUpdateCourse = async (courseId: string, data: Partial<Course>) => {
+  const handleUpdateCourse = async (e: React.FormEvent, courseId: string) => {
+    e.preventDefault();
+    const formData = new FormData(e.target as HTMLFormElement);
+    const data: Partial<Course> = {};
+    for (const [key, value] of formData) {
+      data[key as keyof Course] = value as never;
+    }
+
     try {
       await updateCourse(courseId, data);
       toast({
         title: "Curso atualizado",
         description: "As informações foram atualizadas com sucesso!",
       });
-      setModalOpen(false);
+      setIsModalOpen(false); // Fecha o modal após sucesso
     } catch (error) {
       toast({
         variant: "destructive",
@@ -63,7 +75,13 @@ export default function CourseList() {
 
   const formatDate = (date: any) => {
     if (!date) return "N/A";
-    return new Date(date.seconds * 1000).toLocaleDateString("pt-BR");
+    if (date instanceof Date) {
+      return date.toLocaleDateString("pt-BR");
+    }
+    if (date.seconds) {
+      return new Date(date.seconds * 1000).toLocaleDateString("pt-BR");
+    }
+    return "Data inválida";
   };
 
   const formatPrice = (price: number) => {
@@ -72,6 +90,10 @@ export default function CourseList() {
       currency: "BRL",
     }).format(price);
   };
+
+  if (error) {
+    return <div className="p-4">Erro ao carregar cursos: {error}</div>;
+  }
 
   return (
     <div className="container py-8">
@@ -150,9 +172,22 @@ export default function CourseList() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {courses.map((course) => (
+            {courses?.map((course) => course && (
               <TableRow key={course.id}>
-                <TableCell className="font-medium">{course.title}</TableCell>
+                <TableCell className="font-medium">
+                  <div className="flex items-center gap-3">
+                    <img
+                      src={course.thumbnail}
+                      alt={course.title}
+                      className="h-10 w-10 rounded-lg object-cover"
+                      onError={(e) => {
+                        const img = e.target as HTMLImageElement;
+                        img.src = "https://placehold.co/100x100?text=Sem+Imagem";
+                      }}
+                    />
+                    <span>{course.title}</span>
+                  </div>
+                </TableCell>
                 <TableCell>{course.instructor?.name || 'Sem instrutor'}</TableCell>
                 <TableCell>
                   <Badge variant="outline">{course.category}</Badge>
@@ -173,82 +208,266 @@ export default function CourseList() {
                 </TableCell>
                 <TableCell>{formatDate(course.createdAt)}</TableCell>
                 <TableCell>
-                  <Dialog open={modalOpen} onOpenChange={setModalOpen}>
+                  <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
                     <DialogTrigger asChild>
                       <Button
                         variant="ghost"
                         size="icon"
                         onClick={() => {
                           setSelectedCourse(course);
-                          setModalOpen(true);
+                          setIsModalOpen(true);
                         }}
                       >
                         <Settings className="h-4 w-4" />
                       </Button>
                     </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Editar Curso</DialogTitle>
-                      </DialogHeader>
-                      {selectedCourse && (
-                        <div className="space-y-4">
-                          <div>
-                            <label className="text-sm font-medium">Status</label>
-                            <Select
-                              value={selectedCourse.status}
-                              onValueChange={(value) =>
-                                setSelectedCourse({
-                                  ...selectedCourse,
-                                  status: value,
-                                })
-                              }
-                            >
-                              <SelectTrigger>
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="published">Publicado</SelectItem>
-                                <SelectItem value="draft">Rascunho</SelectItem>
-                                <SelectItem value="archived">Arquivado</SelectItem>
-                              </SelectContent>
-                            </Select>
+                    {selectedCourse && (
+                      <DialogContent 
+                        className="max-w-3xl max-h-[90vh] overflow-y-auto"
+                        onOpenAutoFocus={(e) => e.preventDefault()}
+                        onCloseAutoFocus={(e) => e.preventDefault()}
+                      >
+                        <DialogHeader>
+                          <DialogTitle>Editar Curso</DialogTitle>
+                          <DialogDescription>
+                            Faça as alterações necessárias no curso
+                          </DialogDescription>
+                        </DialogHeader>
+                        <form onSubmit={(e) => handleUpdateCourse(e, selectedCourse.id)}>
+                          <div className="grid gap-6 py-4">
+                            <div className="grid gap-4">
+                              <div className="space-y-2">
+                                <Label htmlFor="title">Título do Curso</Label>
+                                <Input
+                                  id="title"
+                                  name="title"
+                                  defaultValue={selectedCourse.title}
+                                  required
+                                />
+                              </div>
+                              
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                  <Label htmlFor="shortDescription">Descrição Curta</Label>
+                                  <Input
+                                    id="shortDescription"
+                                    name="shortDescription"
+                                    defaultValue={selectedCourse.shortDescription}
+                                    placeholder="Breve descrição para listagem"
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label htmlFor="duration">Duração</Label>
+                                  <Input
+                                    id="duration"
+                                    name="duration"
+                                    defaultValue={selectedCourse.duration}
+                                    placeholder="Ex: 10 horas"
+                                  />
+                                </div>
+                              </div>
+
+                              <div className="space-y-2">
+                                <Label htmlFor="description">Descrição Completa</Label>
+                                <Textarea
+                                  id="description"
+                                  name="description"
+                                  defaultValue={selectedCourse.description}
+                                  className="min-h-[100px]"
+                                  required
+                                />
+                              </div>
+
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                  <Label htmlFor="category">Categoria</Label>
+                                  <Select
+                                    name="category"
+                                    defaultValue={selectedCourse.category}
+                                  >
+                                    <SelectTrigger>
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="programming">Programação</SelectItem>
+                                      <SelectItem value="design">Design</SelectItem>
+                                      <SelectItem value="business">Negócios</SelectItem>
+                                      <SelectItem value="marketing">Marketing</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+
+                                <div className="space-y-2">
+                                  <Label htmlFor="subcategory">Subcategoria</Label>
+                                  <Input
+                                    id="subcategory"
+                                    name="subcategory"
+                                    defaultValue={selectedCourse.subcategory}
+                                    placeholder="Ex: React, JavaScript, etc."
+                                  />
+                                </div>
+                              </div>
+
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                  <Label htmlFor="level">Nível</Label>
+                                  <Select
+                                    name="level"
+                                    defaultValue={selectedCourse.level || "beginner"}
+                                  >
+                                    <SelectTrigger>
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="beginner">Iniciante</SelectItem>
+                                      <SelectItem value="intermediate">Intermediário</SelectItem>
+                                      <SelectItem value="advanced">Avançado</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+
+                                <div className="space-y-2">
+                                  <Label htmlFor="language">Idioma</Label>
+                                  <Select
+                                    name="language"
+                                    defaultValue={selectedCourse.language || "pt-BR"}
+                                  >
+                                    <SelectTrigger>
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="pt-BR">Português</SelectItem>
+                                      <SelectItem value="en">Inglês</SelectItem>
+                                      <SelectItem value="es">Espanhol</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              </div>
+
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                  <Label htmlFor="price">Preço (R$)</Label>
+                                  <Input
+                                    id="price"
+                                    name="price"
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    defaultValue={selectedCourse.price}
+                                    required
+                                  />
+                                </div>
+
+                                <div className="space-y-2">
+                                  <Label htmlFor="status">Status</Label>
+                                  <Select name="status" defaultValue={selectedCourse.status}>
+                                    <SelectTrigger>
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="draft">Rascunho</SelectItem>
+                                      <SelectItem value="published">Publicado</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              </div>
+
+                              <div className="space-y-2">
+                                <Label htmlFor="thumbnail">URL da Imagem</Label>
+                                <Input
+                                  id="thumbnail"
+                                  name="thumbnail"
+                                  type="url"
+                                  defaultValue={selectedCourse.thumbnail}
+                                  placeholder="https://exemplo.com/imagem.jpg"
+                                  required
+                                />
+                                {selectedCourse.thumbnail && (
+                                  <div className="mt-2">
+                                    <img
+                                      src={selectedCourse.thumbnail}
+                                      alt="Preview"
+                                      className="max-w-full h-auto rounded-lg"
+                                      style={{ maxHeight: "200px" }}
+                                      onError={(e) => {
+                                        const img = e.target as HTMLImageElement;
+                                        img.src = "https://placehold.co/600x400?text=Imagem+Inválida";
+                                      }}
+                                    />
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="space-y-2">
+                                <Label htmlFor="supportEmail">Email de Suporte</Label>
+                                <Input
+                                  id="supportEmail"
+                                  name="supportEmail"
+                                  type="email"
+                                  defaultValue={selectedCourse.supportEmail}
+                                  placeholder="suporte@exemplo.com"
+                                />
+                              </div>
+
+                              <div className="space-y-2">
+                                <Label htmlFor="prerequisites">Pré-requisitos</Label>
+                                <Textarea
+                                  id="prerequisites"
+                                  name="prerequisites"
+                                  defaultValue={selectedCourse.prerequisites?.join("\n")}
+                                  placeholder="Um pré-requisito por linha"
+                                  className="min-h-[80px]"
+                                />
+                              </div>
+
+                              <div className="space-y-2">
+                                <Label htmlFor="learningObjectives">Objetivos de Aprendizagem</Label>
+                                <Textarea
+                                  id="learningObjectives"
+                                  name="learningObjectives"
+                                  defaultValue={selectedCourse.learningObjectives?.join("\n")}
+                                  placeholder="Um objetivo por linha"
+                                  className="min-h-[80px]"
+                                />
+                              </div>
+
+                              <div className="space-y-2">
+                                <Label htmlFor="tags">Tags</Label>
+                                <Input
+                                  id="tags"
+                                  name="tags"
+                                  defaultValue={selectedCourse.tags?.join(", ")}
+                                  placeholder="Separe as tags por vírgula"
+                                />
+                              </div>
+
+                              <div className="flex items-center space-x-2">
+                                <Checkbox
+                                  id="certificateAvailable"
+                                  name="certificateAvailable"
+                                  defaultChecked={selectedCourse.certificateAvailable}
+                                />
+                                <Label htmlFor="certificateAvailable">
+                                  Certificado Disponível
+                                </Label>
+                              </div>
+                            </div>
                           </div>
-                          <div>
-                            <label className="text-sm font-medium">Categoria</label>
-                            <Select
-                              value={selectedCourse.category}
-                              onValueChange={(value) =>
-                                setSelectedCourse({
-                                  ...selectedCourse,
-                                  category: value,
-                                })
-                              }
-                            >
-                              <SelectTrigger>
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="programming">Programação</SelectItem>
-                                <SelectItem value="design">Design</SelectItem>
-                                <SelectItem value="business">Negócios</SelectItem>
-                                <SelectItem value="marketing">Marketing</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <Button
-                            className="w-full"
-                            onClick={() =>
-                              handleUpdateCourse(selectedCourse.id, {
-                                status: selectedCourse.status,
-                                category: selectedCourse.category,
-                              })
-                            }
-                          >
-                            Salvar alterações
-                          </Button>
-                        </div>
-                      )}
-                    </DialogContent>
+                          <DialogFooter>
+                            <Button type="submit" disabled={loading}>
+                              {loading ? (
+                                <>
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  Salvando...
+                                </>
+                              ) : (
+                                "Salvar alterações"
+                              )}
+                            </Button>
+                          </DialogFooter>
+                        </form>
+                      </DialogContent>
+                    )}
                   </Dialog>
                 </TableCell>
               </TableRow>
