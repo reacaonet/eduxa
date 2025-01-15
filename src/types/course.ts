@@ -1,44 +1,31 @@
 import { User } from "./user";
 
 export interface Course {
-  id?: string;
+  id: string;
   title: string;
   description: string;
-  shortDescription?: string;
+  shortDescription: string;
   category: string;
   subcategory?: string;
   price: number;
   thumbnail: string;
-  status: "draft" | "published";
+  status: "draft" | "published" | "archived";
   instructor: {
     id: string;
     name: string;
     email: string | null;
   };
-  duration?: string;
-  level?: "beginner" | "intermediate" | "advanced";
+  duration: string;
+  level: "beginner" | "intermediate" | "advanced";
+  language: string;
+  supportEmail: string;
   prerequisites?: string[];
   learningObjectives?: string[];
-  language?: string;
-  features?: string[];
   tags?: string[];
-  createdAt: Date;
-  updatedAt: Date;
-  modules: {
-    id: string;
-    title: string;
-    description?: string;
-    order: number;
-    lessons: {
-      id: string;
-      title: string;
-      description?: string;
-      duration?: string;
-      type: "video" | "text" | "quiz";
-      content?: string;
-      order: number;
-    }[];
-  }[];
+  certificateAvailable?: boolean;
+  createdAt?: Date;
+  updatedAt?: Date;
+  modules?: Module[];
   enrolledStudents: number;
   rating: number;
   reviews: {
@@ -49,10 +36,24 @@ export interface Course {
     comment: string;
     createdAt: Date;
   }[];
-  certificateAvailable?: boolean;
-  supportEmail?: string;
   faq?: {
     question: string;
     answer: string;
   }[];
+}
+
+export interface Module {
+  id: string;
+  title: string;
+  description: string;
+  lessons?: Lesson[];
+}
+
+export interface Lesson {
+  id: string;
+  title: string;
+  description: string;
+  duration: number; // em minutos
+  type: 'video' | 'text' | 'quiz';
+  content: string;
 }

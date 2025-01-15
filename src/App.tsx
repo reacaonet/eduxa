@@ -23,6 +23,7 @@ import ManageUsers from "@/pages/admin/ManageUsers";
 import UserList from "@/pages/admin/UserList";
 import CourseList from "@/pages/admin/CourseList";
 import CreateCourse from "@/pages/admin/CreateCourse";
+import CourseModules from "@/pages/admin/CourseModules";
 
 const queryClient = new QueryClient();
 
@@ -51,7 +52,7 @@ function App() {
                   </ProtectedRoute>
                 } />
                 
-                {/* Dashboard Routes */}
+                {/* Admin Routes */}
                 <Route
                   path="/admin/dashboard"
                   element={
@@ -69,6 +70,48 @@ function App() {
                   }
                 />
                 <Route
+                  path="/admin/users"
+                  element={
+                    <ProtectedRoute requiredRole="admin">
+                      <UserList />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/users/manage"
+                  element={
+                    <ProtectedRoute requiredRole="admin">
+                      <ManageUsers />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/courses"
+                  element={
+                    <ProtectedRoute requiredRole="admin">
+                      <CourseList />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/courses/new"
+                  element={
+                    <ProtectedRoute requiredRole="admin">
+                      <CreateCourse />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/courses/:courseId/modules"
+                  element={
+                    <ProtectedRoute requiredRole="admin">
+                      <CourseModules />
+                    </ProtectedRoute>
+                  }
+                />
+
+                {/* Teacher Routes */}
+                <Route
                   path="/teacher/dashboard"
                   element={
                     <ProtectedRoute requiredRole="teacher">
@@ -84,6 +127,8 @@ function App() {
                     </ProtectedRoute>
                   }
                 />
+
+                {/* Student Routes */}
                 <Route
                   path="/student/dashboard"
                   element={
@@ -97,35 +142,6 @@ function App() {
                   element={
                     <ProtectedRoute requiredRole="student">
                       <StudentProfile />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/admin/users"
-                  element={
-                    <ProtectedRoute requiredRole="admin">
-                      <UserList />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route path="/admin/users/manage" element={
-                  <ProtectedRoute requiredRole="admin">
-                    <ManageUsers />
-                  </ProtectedRoute>
-                } />
-                <Route
-                  path="/admin/courses"
-                  element={
-                    <ProtectedRoute requiredRole="admin">
-                      <CourseList />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/admin/courses/new"
-                  element={
-                    <ProtectedRoute requiredRole="admin">
-                      <CreateCourse />
                     </ProtectedRoute>
                   }
                 />
