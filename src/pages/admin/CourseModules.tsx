@@ -33,6 +33,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { RichTextEditor } from "@/components/RichTextEditor";
 import { Course, Module, Lesson } from "@/types/course";
 import { useCourses } from "@/hooks/useCourses";
 import { useToast } from "@/components/ui/use-toast";
@@ -49,6 +50,7 @@ export default function CourseModules() {
     updateLesson,
     deleteLesson,
     reorderModules,
+    reorderLessons,
   } = useCourses();
 
   const [course, setCourse] = useState<Course | null>(null);
@@ -212,18 +214,18 @@ export default function CourseModules() {
 
     const { source, destination, type } = result;
 
-    // If dragging a module
+    // Se arrastando um módulo
     if (type === "module") {
       const newModules = Array.from(modules);
       const [removed] = newModules.splice(source.index, 1);
       newModules.splice(destination.index, 0, removed);
 
       setModules(newModules);
-      await reorderModules(course.id, newModules.map(m => m.id));
+      await reorderModules(course.id, newModules);
       return;
     }
 
-    // If dragging a lesson within a module
+    // Se arrastando uma aula dentro de um módulo
     const moduleIndex = parseInt(source.droppableId.split("-")[1]);
     const newModules = [...modules];
     const moduleToUpdate = { ...newModules[moduleIndex] };
@@ -236,170 +238,87 @@ export default function CourseModules() {
     newModules[moduleIndex] = moduleToUpdate;
     setModules(newModules);
 
-    // You might want to add a function to update lesson order in the backend
-    // await updateLessonOrder(course.id, moduleToUpdate.id, lessons.map(l => l.id));
+    // Atualizar a ordem das aulas no backend
+    await reorderLessons(course.id, moduleToUpdate.id, lessons);
   };
-
-  // ... resto do código existente ...
 
   return (
     <div className="container mx-auto py-6">
-      {/* ... código existente ... */}
-      
-      {/* Dialog de Edição de Módulo */}
-      <Dialog open={isEditModuleOpen} onOpenChange={setIsEditModuleOpen}>
-        <DialogContent>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">Módulos do Curso</h1>
+        <Button onClick={() => setIsAddModuleOpen(true)}>
+          <Plus className="w-4 h-4 mr-2" />
+          Adicionar Módulo
+        </Button>
+      </div>
+
+      {/* Dialog de Adicionar Módulo */}
+      <Dialog open={isAddModuleOpen} onOpenChange={setIsAddModuleOpen}>
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Editar Módulo</DialogTitle>
+            <DialogTitle>Adicionar Novo Módulo</DialogTitle>
             <DialogDescription>
-              Edite as informações do módulo
+              Preencha as informações do novo módulo
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="edit-module-title">Título</Label>
+              <Label htmlFor="module-title">Título</Label>
               <Input
-                id="edit-module-title"
-                value={editingModule.title}
+                id="module-title"
+                value={newModule.title}
                 onChange={(e) =>
-                  setEditingModule({ ...editingModule, title: e.target.value })
+                  setNewModule({ ...newModule, title: e.target.value })
                 }
               />
             </div>
             <div>
-              <Label htmlFor="edit-module-description">Descrição</Label>
+              <Label htmlFor="module-description">Descrição</Label>
               <Textarea
-                id="edit-module-description"
-                value={editingModule.description}
+                id="module-description"
+                value={newModule.description}
                 onChange={(e) =>
-                  setEditingModule({ ...editingModule, description: e.target.value })
+                  setNewModule({ ...newModule, description: e.target.value })
                 }
               />
             </div>
-            <Button onClick={handleEditModule}>Salvar Alterações</Button>
+            <Button onClick={async () => {
+              if (!course || !newModule.title) {
+                toast({
+                  title: "Erro",
+                  description: "O título do módulo é obrigatório",
+                  variant: "destructive",
+                });
+                return;
+              }
+
+              try {
+                const success = await addModule(course.id, newModule);
+                if (success) {
+                  const updatedCourse = await getCourseById(course.id);
+                  if (updatedCourse) {
+                    setModules(updatedCourse.modules || []);
+                  }
+                  setIsAddModuleOpen(false);
+                  setNewModule({ title: "", description: "" });
+                  toast({
+                    title: "Sucesso",
+                    description: "Módulo adicionado com sucesso!",
+                  });
+                }
+              } catch (error) {
+                toast({
+                  title: "Erro",
+                  description: "Erro ao adicionar módulo",
+                  variant: "destructive",
+                });
+              }
+            }}>
+              Adicionar Módulo
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
-
-      {/* Dialog de Edição de Aula */}
-      <Dialog open={isEditLessonOpen} onOpenChange={setIsEditLessonOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Editar Aula</DialogTitle>
-            <DialogDescription>
-              Edite as informações da aula
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="edit-lesson-title">Título</Label>
-              <Input
-                id="edit-lesson-title"
-                value={editingLesson.title}
-                onChange={(e) =>
-                  setEditingLesson({ ...editingLesson, title: e.target.value })
-                }
-              />
-            </div>
-            <div>
-              <Label htmlFor="edit-lesson-description">Descrição</Label>
-              <Textarea
-                id="edit-lesson-description"
-                value={editingLesson.description}
-                onChange={(e) =>
-                  setEditingLesson({ ...editingLesson, description: e.target.value })
-                }
-              />
-            </div>
-            <div>
-              <Label htmlFor="edit-lesson-duration">Duração (minutos)</Label>
-              <Input
-                id="edit-lesson-duration"
-                type="number"
-                value={editingLesson.duration}
-                onChange={(e) =>
-                  setEditingLesson({ ...editingLesson, duration: e.target.value })
-                }
-              />
-            </div>
-            <div>
-              <Label htmlFor="edit-lesson-type">Tipo</Label>
-              <Select
-                value={editingLesson.type}
-                onValueChange={(value) =>
-                  setEditingLesson({ ...editingLesson, type: value })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o tipo" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="video">Vídeo</SelectItem>
-                  <SelectItem value="text">Texto</SelectItem>
-                  <SelectItem value="quiz">Quiz</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="edit-lesson-content">Conteúdo</Label>
-              <Textarea
-                id="edit-lesson-content"
-                value={editingLesson.content}
-                onChange={(e) =>
-                  setEditingLesson({ ...editingLesson, content: e.target.value })
-                }
-              />
-            </div>
-            <Button onClick={handleEditLesson}>Salvar Alterações</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Diálogo de Confirmação de Exclusão de Módulo */}
-      <AlertDialog open={isDeleteModuleDialogOpen} onOpenChange={setIsDeleteModuleDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
-            <AlertDialogDescription>
-              Tem certeza que deseja excluir este módulo? Esta ação não pode ser desfeita.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={() => {
-              if (moduleToDelete) {
-                handleDeleteModule(moduleToDelete);
-                setIsDeleteModuleDialogOpen(false);
-              }
-            }}>
-              Excluir
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Diálogo de Confirmação de Exclusão de Aula */}
-      <AlertDialog open={isDeleteLessonDialogOpen} onOpenChange={setIsDeleteLessonDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
-            <AlertDialogDescription>
-              Tem certeza que deseja excluir esta aula? Esta ação não pode ser desfeita.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={() => {
-              if (lessonToDelete) {
-                handleDeleteLesson(lessonToDelete.moduleId, lessonToDelete.lessonId);
-                setIsDeleteLessonDialogOpen(false);
-              }
-            }}>
-              Excluir
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       <DragDropContext onDragEnd={handleDragEnd}>
         <Droppable droppableId="modules" type="module">
@@ -566,7 +485,7 @@ export default function CourseModules() {
 
       {/* Dialog de Adicionar Aula */}
       <Dialog open={isAddLessonOpen} onOpenChange={setIsAddLessonOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-4xl">
           <DialogHeader>
             <DialogTitle>Adicionar Nova Aula</DialogTitle>
             <DialogDescription>
@@ -625,11 +544,10 @@ export default function CourseModules() {
             </div>
             <div>
               <Label htmlFor="content">Conteúdo</Label>
-              <Textarea
-                id="content"
-                value={newLesson.content}
-                onChange={(e) =>
-                  setNewLesson({ ...newLesson, content: e.target.value })
+              <RichTextEditor
+                content={newLesson.content}
+                onChange={(content) =>
+                  setNewLesson({ ...newLesson, content })
                 }
               />
             </div>
@@ -637,6 +555,160 @@ export default function CourseModules() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Dialog de Edição de Módulo */}
+      <Dialog open={isEditModuleOpen} onOpenChange={setIsEditModuleOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Editar Módulo</DialogTitle>
+            <DialogDescription>
+              Edite as informações do módulo
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="edit-module-title">Título</Label>
+              <Input
+                id="edit-module-title"
+                value={editingModule.title}
+                onChange={(e) =>
+                  setEditingModule({ ...editingModule, title: e.target.value })
+                }
+              />
+            </div>
+            <div>
+              <Label htmlFor="edit-module-description">Descrição</Label>
+              <Textarea
+                id="edit-module-description"
+                value={editingModule.description}
+                onChange={(e) =>
+                  setEditingModule({ ...editingModule, description: e.target.value })
+                }
+              />
+            </div>
+            <Button onClick={handleEditModule}>Salvar Alterações</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de Edição de Aula */}
+      <Dialog open={isEditLessonOpen} onOpenChange={setIsEditLessonOpen}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Editar Aula</DialogTitle>
+            <DialogDescription>
+              Edite as informações da aula
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="edit-lesson-title">Título</Label>
+              <Input
+                id="edit-lesson-title"
+                value={editingLesson.title}
+                onChange={(e) =>
+                  setEditingLesson({ ...editingLesson, title: e.target.value })
+                }
+              />
+            </div>
+            <div>
+              <Label htmlFor="edit-lesson-description">Descrição</Label>
+              <Textarea
+                id="edit-lesson-description"
+                value={editingLesson.description}
+                onChange={(e) =>
+                  setEditingLesson({ ...editingLesson, description: e.target.value })
+                }
+              />
+            </div>
+            <div>
+              <Label htmlFor="edit-lesson-duration">Duração (minutos)</Label>
+              <Input
+                id="edit-lesson-duration"
+                type="number"
+                value={editingLesson.duration}
+                onChange={(e) =>
+                  setEditingLesson({ ...editingLesson, duration: e.target.value })
+                }
+              />
+            </div>
+            <div>
+              <Label htmlFor="edit-lesson-type">Tipo</Label>
+              <Select
+                value={editingLesson.type}
+                onValueChange={(value) =>
+                  setEditingLesson({ ...editingLesson, type: value })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="video">Vídeo</SelectItem>
+                  <SelectItem value="text">Texto</SelectItem>
+                  <SelectItem value="quiz">Quiz</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="edit-lesson-content">Conteúdo</Label>
+              <RichTextEditor
+                content={editingLesson.content}
+                onChange={(content) =>
+                  setEditingLesson({ ...editingLesson, content })
+                }
+              />
+            </div>
+            <Button onClick={handleEditLesson}>Salvar Alterações</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Diálogo de Confirmação de Exclusão de Módulo */}
+      <AlertDialog open={isDeleteModuleDialogOpen} onOpenChange={setIsDeleteModuleDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir este módulo? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={() => {
+              if (moduleToDelete) {
+                handleDeleteModule(moduleToDelete);
+                setIsDeleteModuleDialogOpen(false);
+              }
+            }}>
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Diálogo de Confirmação de Exclusão de Aula */}
+      <AlertDialog open={isDeleteLessonDialogOpen} onOpenChange={setIsDeleteLessonDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir esta aula? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={() => {
+              if (lessonToDelete) {
+                handleDeleteLesson(lessonToDelete.moduleId, lessonToDelete.lessonId);
+                setIsDeleteLessonDialogOpen(false);
+              }
+            }}>
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

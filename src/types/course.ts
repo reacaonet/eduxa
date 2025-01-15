@@ -56,4 +56,5 @@ export interface Lesson {
   duration: number; // em minutos
   type: 'video' | 'text' | 'quiz';
   content: string;
+  videoUrl?: string; // URL do vídeo para aulas do tipo 'video'
 }

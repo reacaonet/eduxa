@@ -7,8 +7,8 @@ interface Enrollment {
   id: string;
   userId: string;
   courseId: string;
-  enrolledAt: Date;
   status: 'active' | 'completed' | 'cancelled';
+  enrolledAt: Date;
   progress: {
     completedLessons: string[];
     lastAccessedLesson: string;

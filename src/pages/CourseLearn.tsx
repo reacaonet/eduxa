@@ -58,6 +58,8 @@ const CourseLearn = () => {
   const [currentModule, setCurrentModule] = useState<Module | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [updatingProgress, setUpdatingProgress] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [completedLessons, setCompletedLessons] = useState<string[]>([]);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -74,7 +76,24 @@ const CourseLearn = () => {
           throw new Error("Course not found");
         }
 
-        const courseData = { id: courseDoc.id, ...courseDoc.data() } as Course;
+        const rawData = courseDoc.data();
+        console.log("Raw lesson data:", rawData.modules?.map((m: any) => m.lessons));
+
+        const courseData = { 
+          id: courseDoc.id, 
+          ...rawData,
+          modules: rawData.modules?.map((module: any) => ({
+            ...module,
+            lessons: module.lessons?.map((lesson: any) => ({
+              ...lesson,
+              // Não precisamos mais converter o conteúdo, apenas passar como está
+              content: lesson.content || ''
+            }))
+          }))
+        } as Course;
+
+        console.log("Processed lesson data:", courseData.modules?.map(m => m.lessons));
+
         setCourse(courseData);
 
         // Set initial lesson if enrollment exists
@@ -101,6 +120,15 @@ const CourseLearn = () => {
 
     fetchCourse();
   }, [courseId, enrollment]);
+
+  useEffect(() => {
+    if (enrollment?.progress?.completedLessons) {
+      setCompletedLessons(enrollment.progress.completedLessons);
+      const totalLessons = course?.modules.reduce((total, module) => 
+        total + module.lessons.length, 0) || 0;
+      setProgress(Math.round((enrollment.progress.completedLessons.length / totalLessons) * 100));
+    }
+  }, [enrollment, course]);
 
   // Redirect if not logged in or not enrolled
   if (!user) {
@@ -142,22 +170,23 @@ const CourseLearn = () => {
     return `${hours}h${mins > 0 ? ` ${mins}min` : ''}`;
   };
 
-  const calculateProgress = () => {
-    if (!enrollment) return 0;
-    
-    const totalLessons = course.modules.reduce((total, module) => 
-      total + module.lessons.length, 0);
-    
-    return Math.round((enrollment.progress.completedLessons.length / totalLessons) * 100);
-  };
-
   const handleLessonComplete = async () => {
     if (!enrollment || !currentLesson) return;
 
     try {
       setUpdatingProgress(true);
-      const isCompleted = enrollment.progress.completedLessons.includes(currentLesson.id);
+      const isCompleted = completedLessons.includes(currentLesson.id);
+      const newCompletedLessons = isCompleted
+        ? completedLessons.filter(id => id !== currentLesson.id)
+        : [...completedLessons, currentLesson.id];
+
       await updateLessonProgress(enrollment.id, currentLesson.id, !isCompleted);
+      
+      // Atualizar estado local imediatamente
+      setCompletedLessons(newCompletedLessons);
+      const totalLessons = course?.modules.reduce((total, module) => 
+        total + module.lessons.length, 0) || 0;
+      setProgress(Math.round((newCompletedLessons.length / totalLessons) * 100));
       
       toast({
         title: isCompleted ? "Aula marcada como incompleta" : "Aula concluída!",
@@ -181,9 +210,9 @@ const CourseLearn = () => {
     <div className="w-full h-full bg-background">
       <div className="p-4">
         <h2 className="text-lg font-semibold mb-2">{course.title}</h2>
-        <Progress value={calculateProgress()} className="mb-4" />
+        <Progress value={progress} className="mb-4" />
         <p className="text-sm text-muted-foreground">
-          {calculateProgress()}% completo
+          {progress}% completo
         </p>
       </div>
       <ScrollArea className="h-[calc(100vh-12rem)]">
@@ -204,7 +233,7 @@ const CourseLearn = () => {
                       currentLesson?.id === lesson.id ? 'bg-accent' : ''
                     }`}
                   >
-                    {enrollment?.progress.completedLessons.includes(lesson.id) ? (
+                    {completedLessons.includes(lesson.id) ? (
                       <CheckCircle className="w-4 h-4 text-primary" />
                     ) : (
                       <Play className="w-4 h-4" />
@@ -226,89 +255,81 @@ const CourseLearn = () => {
   return (
     <div className="min-h-screen pt-16">
       <div className="flex h-[calc(100vh-4rem)]">
-        {/* Sidebar para telas grandes */}
-        <div className="hidden lg:block w-80 border-r">
+        {/* Sidebar para desktop */}
+        <div className="hidden md:block w-80 border-r">
           <Sidebar />
         </div>
 
-        {/* Conteúdo Principal */}
-        <div className="flex-1">
-          {/* Barra superior */}
-          <div className="h-14 border-b flex items-center justify-between px-4">
-            <div className="flex items-center gap-2">
+        {/* Conteúdo principal */}
+        <div className="flex-1 flex flex-col">
+          {/* Header */}
+          <div className="border-b p-4 flex items-center justify-between">
+            <div className="flex items-center gap-4">
               <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
                 <SheetTrigger asChild>
-                  <Button variant="ghost" size="icon" className="lg:hidden">
+                  <Button variant="ghost" size="icon" className="md:hidden">
                     <Menu className="h-5 w-5" />
                   </Button>
                 </SheetTrigger>
                 <SheetContent side="left" className="p-0 w-80">
+                  <SheetHeader className="px-4 py-2">
+                    <SheetTitle>Conteúdo do Curso</SheetTitle>
+                  </SheetHeader>
                   <Sidebar />
                 </SheetContent>
               </Sheet>
-              {currentModule && (
-                <div>
-                  <h2 className="font-medium">{currentModule.title}</h2>
-                  <p className="text-sm text-muted-foreground">
-                    {currentLesson?.title}
-                  </p>
-                </div>
-              )}
+              <div>
+                <h1 className="font-semibold">{currentModule?.title}</h1>
+                <p className="text-sm text-muted-foreground">{currentLesson?.title}</p>
+              </div>
             </div>
-            <Progress 
-              value={calculateProgress()} 
-              className="w-32"
-            />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleLessonComplete}
+              disabled={updatingProgress}
+            >
+              {updatingProgress ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : completedLessons.includes(currentLesson?.id || '') ? (
+                <CheckCircle className="h-4 w-4 mr-2" />
+              ) : (
+                <Circle className="h-4 w-4 mr-2" />
+              )}
+              {completedLessons.includes(currentLesson?.id || '')
+                ? "Concluída"
+                : "Marcar como concluída"}
+            </Button>
           </div>
 
-          {/* Área do Conteúdo */}
-          <div className="p-4">
+          {/* Área do conteúdo */}
+          <div className="flex-1 p-6 overflow-auto">
             {currentLesson ? (
-              <div>
-                {currentLesson.videoUrl ? (
-                  <div className="aspect-video mb-4">
-                    <iframe
-                      src={currentLesson.videoUrl}
-                      className="w-full h-full"
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
-                    />
+              <div className="max-w-3xl mx-auto">
+                {currentLesson.type === 'video' ? (
+                  <div>
+                    <div className="aspect-video mb-4">
+                      <div dangerouslySetInnerHTML={{ __html: currentLesson.content || '' }} />
+                    </div>
+                  </div>
+                ) : currentLesson.type === 'text' ? (
+                  <div className="prose prose-sm max-w-none dark:prose-invert">
+                    <div dangerouslySetInnerHTML={{ __html: currentLesson.content || '' }} />
                   </div>
                 ) : (
-                  <div className="aspect-video mb-4 bg-accent flex items-center justify-center">
-                    <p>Conteúdo não disponível</p>
-                  </div>
-                )}
-
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-2xl font-semibold">{currentLesson.title}</h2>
-                  <Button
-                    variant={enrollment?.progress.completedLessons.includes(currentLesson.id) ? "outline" : "default"}
-                    onClick={handleLessonComplete}
-                    disabled={updatingProgress}
-                  >
-                    {updatingProgress ? (
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    ) : enrollment?.progress.completedLessons.includes(currentLesson.id) ? (
-                      <CheckCircle className="w-4 h-4 mr-2" />
-                    ) : (
-                      <Circle className="w-4 h-4 mr-2" />
-                    )}
-                    {enrollment?.progress.completedLessons.includes(currentLesson.id) 
-                      ? "Marcar como incompleta" 
-                      : "Marcar como concluída"}
-                  </Button>
-                </div>
-
-                {currentLesson.content && (
-                  <div className="prose prose-slate max-w-none">
-                    {currentLesson.content}
+                  <div className="text-center py-12">
+                    <p className="text-muted-foreground">
+                      Conteúdo não disponível no momento.
+                      {currentLesson.type === 'quiz' && " O quiz será implementado em breve."}
+                    </p>
                   </div>
                 )}
               </div>
             ) : (
-              <div className="text-center py-8">
-                <p>Selecione uma aula para começar</p>
+              <div className="text-center py-12">
+                <p className="text-muted-foreground">
+                  Selecione uma aula para começar.
+                </p>
               </div>
             )}
           </div>

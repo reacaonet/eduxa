@@ -42,6 +42,7 @@ interface UseCoursesReturn {
   updateLesson: (courseId: string, moduleId: string, lessonId: string, lessonData: Partial<Lesson>) => Promise<boolean>;
   deleteLesson: (courseId: string, moduleId: string, lessonId: string) => Promise<boolean>;
   reorderModules: (courseId: string, modules: Module[]) => Promise<boolean>;
+  reorderLessons: (courseId: string, moduleId: string, lessons: Lesson[]) => Promise<boolean>;
 }
 
 export function useCourses({ pageSize = 10 }: UseCoursesOptions = {}): UseCoursesReturn {
@@ -402,6 +403,31 @@ export function useCourses({ pageSize = 10 }: UseCoursesOptions = {}): UseCourse
     }
   }, []);
 
+  const reorderLessons = useCallback(async (courseId: string, moduleId: string, lessons: Lesson[]): Promise<boolean> => {
+    try {
+      const course = await getCourseById(courseId);
+      if (!course || !course.modules) return false;
+
+      const moduleIndex = course.modules.findIndex((m) => m.id === moduleId);
+      if (moduleIndex === -1) return false;
+
+      const updatedModules = [...course.modules];
+      updatedModules[moduleIndex] = {
+        ...updatedModules[moduleIndex],
+        lessons: lessons.map((lesson, index) => ({ ...lesson, order: index })),
+      };
+
+      await updateDoc(doc(db, "courses", courseId), {
+        modules: updatedModules,
+      });
+
+      return true;
+    } catch (error) {
+      console.error("Error reordering lessons:", error);
+      return false;
+    }
+  }, [getCourseById]);
+
   useEffect(() => {
     loadCourses();
   }, [loadCourses]);
@@ -426,5 +452,6 @@ export function useCourses({ pageSize = 10 }: UseCoursesOptions = {}): UseCourse
     updateLesson,
     deleteLesson,
     reorderModules,
+    reorderLessons,
   };
 }
