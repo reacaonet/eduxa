@@ -29,11 +29,11 @@ interface UseCoursesReturn {
   hasMore: boolean;
   loadMore: () => Promise<void>;
   updateCourse: (courseId: string, data: Partial<Course>) => Promise<boolean>;
-  filterCourses: (category?: string, status?: string, search?: string) => Promise<void>;
+  filterCourses: (searchTerm?: string, teacherId?: string) => Promise<void>;
   totalCourses: number;
   getCourses: () => Promise<Course[]>;
   getCourseById: (courseId: string) => Promise<Course | null>;
-  createCourse: (courseData: Omit<Course, "id">) => Promise<Course | null>;
+  createCourse: (courseData: Partial<Course>) => Promise<boolean>;
   deleteCourse: (courseId: string) => Promise<boolean>;
   addModule: (courseId: string, module: Omit<Module, "id">) => Promise<Module | null>;
   updateModule: (courseId: string, moduleId: string, moduleData: Partial<Module>) => Promise<boolean>;
@@ -174,11 +174,40 @@ export function useCourses({ pageSize = 10 }: UseCoursesOptions = {}): UseCourse
   }, [lastDoc, loadCourses]);
 
   const filterCourses = useCallback(
-    async (category?: string, status?: string, search?: string) => {
-      setLastDoc(null); // Reset pagination when applying new filters
-      await loadCourses(category, status, search);
+    async ({ searchTerm = "", teacherId = "" }: { searchTerm?: string, teacherId?: string } = {}) => {
+      try {
+        setLoading(true);
+        let q = query(collection(db, "courses"));
+
+        if (teacherId) {
+          q = query(q, where("teacherId", "==", teacherId));
+        }
+
+        if (searchTerm) {
+          q = query(
+            q,
+            where("title", ">=", searchTerm),
+            where("title", "<=", searchTerm + "\uf8ff")
+          );
+        }
+
+        const querySnapshot = await getDocs(q);
+        const coursesData = querySnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        })) as Course[];
+
+        setCourses(coursesData);
+        setTotalCourses(coursesData.length);
+        setHasMore(false);
+      } catch (error) {
+        console.error("Error filtering courses:", error);
+        setError("Failed to filter courses");
+      } finally {
+        setLoading(false);
+      }
     },
-    [loadCourses]
+    []
   );
 
   const getCourses = useCallback(async (): Promise<Course[]> => {
@@ -194,16 +223,15 @@ export function useCourses({ pageSize = 10 }: UseCoursesOptions = {}): UseCourse
     }
   }, []);
 
-  const createCourse = useCallback(async (courseData: Omit<Course, "id">): Promise<Course | null> => {
+  const createCourse = useCallback(async (courseData: Partial<Course>): Promise<boolean> => {
     try {
       const docRef = await addDoc(collection(db, "courses"), courseData);
-      return {
-        id: docRef.id,
-        ...courseData,
-      };
+      const newCourse = { id: docRef.id, ...courseData } as Course;
+      setCourses((prev) => [...prev, newCourse]);
+      return true;
     } catch (error) {
       console.error("Error creating course:", error);
-      return null;
+      return false;
     }
   }, []);
 

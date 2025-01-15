@@ -24,6 +24,7 @@ import UserList from "@/pages/admin/UserList";
 import CourseList from "@/pages/admin/CourseList";
 import CreateCourse from "@/pages/admin/CreateCourse";
 import CourseModules from "@/pages/admin/CourseModules";
+import TeacherCourseModules from "@/pages/teacher/CourseModules";
 
 const queryClient = new QueryClient();
 
@@ -124,6 +125,14 @@ function App() {
                   element={
                     <ProtectedRoute requiredRole="teacher">
                       <TeacherProfile />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/teacher/courses/:courseId/modules"
+                  element={
+                    <ProtectedRoute requiredRole="teacher">
+                      <TeacherCourseModules />
                     </ProtectedRoute>
                   }
                 />
