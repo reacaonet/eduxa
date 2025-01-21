@@ -9,7 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Play, CheckCircle, Lock, Menu, Loader2, Circle } from "lucide-react";
+import { Play, CheckCircle, Lock, Menu, Loader2, Circle, Award } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import {
   Sheet,
@@ -19,6 +19,8 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { updateLessonProgress } from "@/lib/enrollment";
+import { Certificate } from "@/components/Certificate";
+import { useCertificates } from "@/hooks/useCertificates";
 
 interface Lesson {
   id: string;
@@ -61,6 +63,10 @@ const CourseLearn = () => {
   const [progress, setProgress] = useState(0);
   const [completedLessons, setCompletedLessons] = useState<string[]>([]);
   const { toast } = useToast();
+  const { generateCertificate, getCertificate } = useCertificates();
+  const [showCertificate, setShowCertificate] = useState(false);
+  const [certificate, setCertificate] = useState<any>(null);
+  const [isGeneratingCertificate, setIsGeneratingCertificate] = useState(false);
 
   useEffect(() => {
     const fetchCourse = async () => {
@@ -83,6 +89,7 @@ const CourseLearn = () => {
           id: courseDoc.id, 
           ...rawData,
           modules: rawData.modules?.map((module: any) => ({
+
             ...module,
             lessons: module.lessons?.map((lesson: any) => ({
               ...lesson,
@@ -129,6 +136,19 @@ const CourseLearn = () => {
       setProgress(Math.round((enrollment.progress.completedLessons.length / totalLessons) * 100));
     }
   }, [enrollment, course]);
+
+  useEffect(() => {
+    const checkCertificate = async () => {
+      if (course && user) {
+        const cert = await getCertificate(user.uid, course.id);
+        if (cert) {
+          setCertificate(cert);
+        }
+      }
+    };
+    
+    checkCertificate();
+  }, [course, user, getCertificate]);
 
   // Redirect if not logged in or not enrolled
   if (!user) {
@@ -203,6 +223,38 @@ const CourseLearn = () => {
       });
     } finally {
       setUpdatingProgress(false);
+    }
+  };
+
+  const handleGenerateCertificate = async () => {
+    if (!course || !user) return;
+    
+    try {
+      setIsGeneratingCertificate(true);
+      const cert = await generateCertificate(user.uid, course.id);
+      
+      if (cert) {
+        setCertificate(cert);
+        setShowCertificate(true);
+        toast({
+          title: "Certificado gerado com sucesso!",
+          description: "Parabéns pela conclusão do curso!",
+        });
+      } else {
+        toast({
+          title: "Erro ao gerar certificado",
+          description: "Tente novamente mais tarde.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Erro ao gerar certificado",
+        description: "Tente novamente mais tarde.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingCertificate(false);
     }
   };
 
@@ -300,6 +352,30 @@ const CourseLearn = () => {
                 ? "Concluída"
                 : "Marcar como concluída"}
             </Button>
+            {progress === 100 && (
+              <Button
+                onClick={handleGenerateCertificate}
+                disabled={isGeneratingCertificate}
+                className="ml-4"
+              >
+                {isGeneratingCertificate ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Gerando...
+                  </>
+                ) : certificate ? (
+                  <>
+                    <Award className="mr-2 h-4 w-4" />
+                    Ver Certificado
+                  </>
+                ) : (
+                  <>
+                    <Award className="mr-2 h-4 w-4" />
+                    Gerar Certificado
+                  </>
+                )}
+              </Button>
+            )}
           </div>
 
           {/* Área do conteúdo */}
@@ -335,6 +411,13 @@ const CourseLearn = () => {
           </div>
         </div>
       </div>
+      {certificate && (
+        <Certificate
+          certificate={certificate}
+          open={showCertificate}
+          onClose={() => setShowCertificate(false)}
+        />
+      )}
     </div>
   );
 };
