@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { doc, updateDoc } from "firebase/firestore";
+import { doc, setDoc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,11 +28,21 @@ export default function CompleteProfile() {
       setLoading(true);
       const userRef = doc(db, "users", user.uid);
       
-      await updateDoc(userRef, {
+      // Verificar se o documento existe
+      const userDoc = await getDoc(userRef);
+      
+      // Dados a serem salvos
+      const userData = {
         ...formData,
+        email: user.email,
+        role: user.role || 'student',
         profileCompleted: true,
         updatedAt: new Date(),
-      });
+        createdAt: userDoc.exists() ? userDoc.data().createdAt : new Date(),
+      };
+
+      // Usar setDoc com merge: true para criar ou atualizar
+      await setDoc(userRef, userData, { merge: true });
 
       toast({
         title: "Perfil atualizado",

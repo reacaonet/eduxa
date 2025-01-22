@@ -53,8 +53,19 @@ export interface Lesson {
   id: string;
   title: string;
   description: string;
-  duration: number; // em minutos
-  type: 'video' | 'text' | 'quiz';
   content: string;
-  videoUrl?: string; // URL do vídeo para aulas do tipo 'video'
+  type: "video" | "text" | "quiz";
+  duration: number;
+  videoUrl?: string;
+  materials?: LessonMaterial[];
+}
+
+export interface LessonMaterial {
+  id: string;
+  title: string;
+  type: "document" | "video" | "spreadsheet" | "presentation" | "other";
+  url: string;
+  driveFileId?: string;
+  thumbnailUrl?: string;
+  createdAt: Date;
 }

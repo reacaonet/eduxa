@@ -21,6 +21,7 @@ import {
 import { updateLessonProgress } from "@/lib/enrollment";
 import { Certificate } from "@/components/Certificate";
 import { useCertificates } from "@/hooks/useCertificates";
+import { LessonContent } from "@/components/lessons/LessonContent";
 
 interface Lesson {
   id: string;
@@ -30,6 +31,7 @@ interface Lesson {
   videoUrl?: string;
   content?: string;
   preview?: boolean;
+  materials?: LessonMaterial[];
 }
 
 interface Module {
@@ -380,32 +382,15 @@ const CourseLearn = () => {
 
           {/* Área do conteúdo */}
           <div className="flex-1 p-6 overflow-auto">
-            {currentLesson ? (
-              <div className="max-w-3xl mx-auto">
-                {currentLesson.type === 'video' ? (
-                  <div>
-                    <div className="aspect-video mb-4">
-                      <div dangerouslySetInnerHTML={{ __html: currentLesson.content || '' }} />
-                    </div>
-                  </div>
-                ) : currentLesson.type === 'text' ? (
-                  <div className="prose prose-sm max-w-none dark:prose-invert">
-                    <div dangerouslySetInnerHTML={{ __html: currentLesson.content || '' }} />
-                  </div>
-                ) : (
-                  <div className="text-center py-12">
-                    <p className="text-muted-foreground">
-                      Conteúdo não disponível no momento.
-                      {currentLesson.type === 'quiz' && " O quiz será implementado em breve."}
-                    </p>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="text-center py-12">
-                <p className="text-muted-foreground">
-                  Selecione uma aula para começar.
-                </p>
+            {currentLesson && (
+              <div className="max-w-4xl mx-auto">
+                <LessonContent
+                  lessonId={currentLesson.id}
+                  content={currentLesson.content || ''}
+                  videoUrl={currentLesson.videoUrl}
+                  materials={currentLesson.materials || []}
+                  isInstructor={course.instructor?.id === user?.uid}
+                />
               </div>
             )}
           </div>
