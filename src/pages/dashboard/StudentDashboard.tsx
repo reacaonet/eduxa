@@ -180,7 +180,7 @@ export default function StudentDashboard() {
           ) : (
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
               {enrolledCourses.map((course) => (
-                <Card key={course.id} className="overflow-hidden">
+                <Card key={`${course.id}-${course.enrollmentId}`} className="overflow-hidden">
                   <img
                     src={course.thumbnail || '/placeholder.jpg'}
                     alt={course.title}
