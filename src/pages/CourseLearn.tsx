@@ -85,23 +85,17 @@ const CourseLearn = () => {
         }
 
         const rawData = courseDoc.data();
-        console.log("Raw lesson data:", rawData.modules?.map((m: any) => m.lessons));
-
         const courseData = { 
           id: courseDoc.id, 
           ...rawData,
           modules: rawData.modules?.map((module: any) => ({
-
             ...module,
             lessons: module.lessons?.map((lesson: any) => ({
               ...lesson,
-              // Não precisamos mais converter o conteúdo, apenas passar como está
               content: lesson.content || ''
             }))
           }))
         } as Course;
-
-        console.log("Processed lesson data:", courseData.modules?.map(m => m.lessons));
 
         setCourse(courseData);
 
@@ -128,6 +122,15 @@ const CourseLearn = () => {
     };
 
     fetchCourse();
+
+    // Limpar estados ao desmontar
+    return () => {
+      setCourse(null);
+      setCurrentLesson(null);
+      setCurrentModule(null);
+      setCompletedLessons([]);
+      setProgress(0);
+    };
   }, [courseId, enrollment]);
 
   useEffect(() => {
@@ -260,6 +263,22 @@ const CourseLearn = () => {
     }
   };
 
+  const handleLessonSelect = (lesson: Lesson, module: Module) => {
+    // Não atualizar se já estiver na mesma lição
+    if (currentLesson?.id === lesson.id) return;
+
+    // Limpar estados antes de atualizar
+    setCurrentLesson(null);
+    
+    // Usar setTimeout para garantir que o estado anterior foi limpo
+    setTimeout(() => {
+      setCurrentLesson(lesson);
+      setCurrentModule(module);
+    }, 0);
+    
+    setSidebarOpen(false);
+  };
+
   const Sidebar = () => (
     <div className="w-full h-full bg-background">
       <div className="p-4">
@@ -278,11 +297,7 @@ const CourseLearn = () => {
                 {module.lessons.map((lesson) => (
                   <button
                     key={lesson.id}
-                    onClick={() => {
-                      setCurrentLesson(lesson);
-                      setCurrentModule(module);
-                      setSidebarOpen(false);
-                    }}
+                    onClick={() => handleLessonSelect(lesson, module)}
                     className={`w-full text-left p-2 rounded-lg flex items-center gap-2 hover:bg-accent ${
                       currentLesson?.id === lesson.id ? 'bg-accent' : ''
                     }`}

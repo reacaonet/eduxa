@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LessonMaterial } from '@/types/course';
 import { LessonMaterials } from './LessonMaterials';
@@ -17,6 +17,17 @@ interface LessonContentProps {
 export function LessonContent({ lessonId, content, videoUrl, materials = [], isInstructor = false }: LessonContentProps) {
   const [localMaterials, setLocalMaterials] = useState<LessonMaterial[]>(materials);
   const { toast } = useToast();
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [activeTab, setActiveTab] = useState<string>(videoUrl ? "video" : "content");
+
+  // Limpar iframe quando o componente for desmontado ou a URL mudar
+  useEffect(() => {
+    return () => {
+      if (iframeRef.current) {
+        iframeRef.current.src = 'about:blank';
+      }
+    };
+  }, [videoUrl]);
 
   const handleAddMaterial = async (material: Omit<LessonMaterial, 'id' | 'createdAt'>) => {
     try {
@@ -50,7 +61,7 @@ export function LessonContent({ lessonId, content, videoUrl, materials = [], isI
   };
 
   return (
-    <Tabs defaultValue={videoUrl ? "video" : "content"} className="w-full">
+    <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
       <TabsList>
         {videoUrl && <TabsTrigger value="video">Vídeo</TabsTrigger>}
         <TabsTrigger value="content">Conteúdo</TabsTrigger>
@@ -62,6 +73,7 @@ export function LessonContent({ lessonId, content, videoUrl, materials = [], isI
           <div className="aspect-video">
             {videoUrl.includes('drive.google.com') ? (
               <iframe
+                ref={iframeRef}
                 src={videoUrl.replace('/view', '/preview')}
                 className="w-full h-full"
                 frameBorder="0"
@@ -75,7 +87,7 @@ export function LessonContent({ lessonId, content, videoUrl, materials = [], isI
       )}
 
       <TabsContent value="content" className="mt-4">
-        <div className="prose max-w-none" dangerouslySetInnerHTML={{ __html: content }} />
+        <div className="prose max-w-none dark:prose-invert" dangerouslySetInnerHTML={{ __html: content }} />
       </TabsContent>
 
       <TabsContent value="materials" className="mt-4">
