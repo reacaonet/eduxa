@@ -190,9 +190,21 @@ const CourseLearn = () => {
   }
 
   const formatDuration = (minutes: number) => {
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    return `${hours}h${mins > 0 ? ` ${mins}min` : ''}`;
+    try {
+      const hours = Math.floor(minutes / 60);
+      const mins = minutes % 60;
+      const hoursText = new Intl.NumberFormat(navigator.language || 'pt-BR').format(hours);
+      const minsText = new Intl.NumberFormat(navigator.language || 'pt-BR').format(mins);
+      
+      if (navigator.language?.startsWith('pt')) {
+        return `${hoursText}h${mins > 0 ? ` ${minsText}min` : ''}`;
+      } else {
+        return `${hoursText}h${mins > 0 ? ` ${minsText}m` : ''}`;
+      }
+    } catch (error) {
+      console.error('Error formatting duration:', error);
+      return `${minutes} min`;
+    }
   };
 
   const handleLessonComplete = async () => {

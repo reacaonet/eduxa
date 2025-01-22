@@ -89,25 +89,64 @@ const CourseDetails = () => {
   }, [courseId]);
 
   const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
-    }).format(price);
+    try {
+      return new Intl.NumberFormat(navigator.language || 'pt-BR', {
+        style: 'currency',
+        currency: 'BRL'
+      }).format(price);
+    } catch (error) {
+      console.error('Error formatting price:', error);
+      return `R$ ${price.toFixed(2)}`;
+    }
   };
 
   const formatDuration = (minutes: number) => {
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    return `${hours}h${mins > 0 ? ` ${mins}min` : ''}`;
+    try {
+      const hours = Math.floor(minutes / 60);
+      const mins = minutes % 60;
+      const hoursText = new Intl.NumberFormat(navigator.language || 'pt-BR').format(hours);
+      const minsText = new Intl.NumberFormat(navigator.language || 'pt-BR').format(mins);
+      
+      if (navigator.language?.startsWith('pt')) {
+        return `${hoursText}h${mins > 0 ? ` ${minsText}min` : ''}`;
+      } else {
+        return `${hoursText}h${mins > 0 ? ` ${minsText}m` : ''}`;
+      }
+    } catch (error) {
+      console.error('Error formatting duration:', error);
+      return `${minutes} min`;
+    }
   };
 
   const formatLevel = (level: string) => {
-    const levels = {
-      'beginner': 'Iniciante',
-      'intermediate': 'Intermediário',
-      'advanced': 'Avançado'
+    const levels: Record<string, Record<string, string>> = {
+      'pt': {
+        'beginner': 'Iniciante',
+        'intermediate': 'Intermediário',
+        'advanced': 'Avançado'
+      },
+      'en': {
+        'beginner': 'Beginner',
+        'intermediate': 'Intermediate',
+        'advanced': 'Advanced'
+      }
     };
-    return levels[level as keyof typeof levels] || level;
+
+    const language = navigator.language?.startsWith('pt') ? 'pt' : 'en';
+    return levels[language]?.[level] || level;
+  };
+
+  const formatDate = (date: any) => {
+    try {
+      return new Intl.DateTimeFormat(navigator.language || 'pt-BR', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      }).format(date.toDate());
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return date.toDate().toLocaleDateString();
+    }
   };
 
   const handleEnroll = async () => {

@@ -4,7 +4,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LessonMaterial } from '@/types/course';
-import { FileText, Video, Layout, Table, File } from 'lucide-react';
+import { FileText, Video, Layout, Table, File, ExternalLink } from 'lucide-react';
+import { getGoogleDrivePreviewUrl, isGoogleDriveUrl, getGoogleDriveFileType } from '@/lib/googleDrive';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 interface LessonMaterialsProps {
   materials: LessonMaterial[];
@@ -23,104 +25,90 @@ const MATERIAL_TYPES = {
 export function LessonMaterials({ materials, onAddMaterial, readOnly = false }: LessonMaterialsProps) {
   const [newMaterial, setNewMaterial] = useState({
     title: '',
-    type: 'document' as LessonMaterial['type'],
-    url: '',
+    type: 'document',
+    url: ''
   });
+  const [selectedMaterial, setSelectedMaterial] = useState<LessonMaterial | null>(null);
 
-  const handleAddMaterial = () => {
-    if (!newMaterial.title || !newMaterial.url) return;
-
-    // Extrair o ID do arquivo do Google Drive da URL
-    const driveFileId = extractDriveFileId(newMaterial.url);
-    
-    onAddMaterial?.({
-      ...newMaterial,
-      driveFileId,
-      thumbnailUrl: driveFileId ? `https://drive.google.com/thumbnail?id=${driveFileId}` : undefined,
-    });
-
-    // Limpar o formulário
-    setNewMaterial({
-      title: '',
-      type: 'document',
-      url: '',
-    });
-  };
-
-  const extractDriveFileId = (url: string) => {
-    try {
-      const urlObj = new URL(url);
-      if (urlObj.hostname.includes('drive.google.com')) {
-        // Formato: https://drive.google.com/file/d/FILE_ID/view
-        const matches = url.match(/\/d\/([^/]+)/);
-        if (matches) return matches[1];
-        
-        // Formato: https://drive.google.com/open?id=FILE_ID
-        const searchParams = new URLSearchParams(urlObj.search);
-        const fileId = searchParams.get('id');
-        if (fileId) return fileId;
-      }
-      return undefined;
-    } catch {
-      return undefined;
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (onAddMaterial) {
+      onAddMaterial(newMaterial);
+      setNewMaterial({ title: '', type: 'document', url: '' });
     }
   };
 
-  const getEmbedUrl = (material: LessonMaterial) => {
-    if (!material.driveFileId) return material.url;
-
-    switch (material.type) {
-      case 'document':
-        return `https://docs.google.com/document/d/${material.driveFileId}/preview`;
-      case 'presentation':
-        return `https://docs.google.com/presentation/d/${material.driveFileId}/preview`;
-      case 'spreadsheet':
-        return `https://docs.google.com/spreadsheets/d/${material.driveFileId}/preview`;
-      case 'video':
-        return `https://drive.google.com/file/d/${material.driveFileId}/preview`;
-      default:
-        return material.url;
+  const renderMaterialContent = (material: LessonMaterial) => {
+    if (!isGoogleDriveUrl(material.url)) {
+      return (
+        <a 
+          href={material.url} 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="flex items-center gap-2 p-3 hover:bg-accent rounded-lg transition-colors"
+        >
+          {MATERIAL_TYPES[material.type as keyof typeof MATERIAL_TYPES]?.icon({ className: "w-5 h-5" })}
+          <span>{material.title}</span>
+          <ExternalLink className="w-4 h-4 ml-auto" />
+        </a>
+      );
     }
+
+    const previewUrl = getGoogleDrivePreviewUrl(material.url);
+    if (!previewUrl) return null;
+
+    return (
+      <Dialog>
+        <DialogTrigger asChild>
+          <button className="flex items-center gap-2 p-3 hover:bg-accent rounded-lg transition-colors w-full text-left">
+            {MATERIAL_TYPES[material.type as keyof typeof MATERIAL_TYPES]?.icon({ className: "w-5 h-5" })}
+            <span>{material.title}</span>
+          </button>
+        </DialogTrigger>
+        <DialogContent className="max-w-4xl h-[80vh]">
+          <DialogHeader>
+            <DialogTitle>{material.title}</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 min-h-0">
+            <iframe
+              src={previewUrl}
+              className="w-full h-full rounded-md"
+              allow="autoplay"
+              allowFullScreen
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
   };
 
   return (
     <div className="space-y-4">
-      <h3 className="text-lg font-semibold">Materiais Complementares</h3>
-      
       {/* Lista de materiais */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {materials.map((material) => {
-          const MaterialIcon = MATERIAL_TYPES[material.type].icon;
-          return (
-            <a
-              key={material.id}
-              href={material.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-3 p-3 rounded-lg border hover:bg-gray-50 transition-colors"
-            >
-              <MaterialIcon className="h-6 w-6 text-primary" />
-              <div>
-                <p className="font-medium">{material.title}</p>
-                <p className="text-sm text-gray-500">{MATERIAL_TYPES[material.type].label}</p>
-              </div>
-            </a>
-          );
-        })}
+      <div className="space-y-2">
+        {materials.map((material) => (
+          <div key={material.id}>
+            {renderMaterialContent(material)}
+          </div>
+        ))}
+        {materials.length === 0 && (
+          <p className="text-muted-foreground text-center py-4">
+            Nenhum material complementar disponível.
+          </p>
+        )}
       </div>
 
       {/* Formulário para adicionar novo material */}
-      {!readOnly && (
-        <div className="space-y-4 p-4 border rounded-lg">
-          <h4 className="font-medium">Adicionar Material</h4>
-          
+      {!readOnly && onAddMaterial && (
+        <form onSubmit={handleSubmit} className="space-y-4 pt-4 border-t">
           <div className="space-y-2">
             <Label htmlFor="title">Título</Label>
             <Input
               id="title"
               value={newMaterial.title}
               onChange={(e) => setNewMaterial(prev => ({ ...prev, title: e.target.value }))}
-              placeholder="Ex: Slides da Aula 1"
+              placeholder="Digite o título do material"
+              required
             />
           </div>
 
@@ -128,35 +116,36 @@ export function LessonMaterials({ materials, onAddMaterial, readOnly = false }: 
             <Label htmlFor="type">Tipo</Label>
             <Select
               value={newMaterial.type}
-              onValueChange={(value: LessonMaterial['type']) => 
-                setNewMaterial(prev => ({ ...prev, type: value }))
-              }
+              onValueChange={(value) => setNewMaterial(prev => ({ ...prev, type: value }))}
             >
               <SelectTrigger>
-                <SelectValue />
+                <SelectValue placeholder="Selecione o tipo" />
               </SelectTrigger>
               <SelectContent>
                 {Object.entries(MATERIAL_TYPES).map(([value, { label }]) => (
-                  <SelectItem key={value} value={value}>{label}</SelectItem>
+                  <SelectItem key={value} value={value}>
+                    {label}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="url">Link do Google Drive</Label>
+            <Label htmlFor="url">URL</Label>
             <Input
               id="url"
               value={newMaterial.url}
-              onChange={(e) => setNewMaterial(prev => ({ ...prev, url: e.target.value }))}
-              placeholder="Cole o link de compartilhamento do Google Drive"
+              onChange={(e) => setNewMaterial(prev => ({ ...prev, type: getGoogleDriveFileType(e.target.value) || prev.type, url: e.target.value }))}
+              placeholder="Cole a URL do material"
+              required
             />
           </div>
 
-          <Button onClick={handleAddMaterial} disabled={!newMaterial.title || !newMaterial.url}>
+          <Button type="submit" className="w-full">
             Adicionar Material
           </Button>
-        </div>
+        </form>
       )}
     </div>
   );
