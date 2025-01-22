@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, Timestamp, doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -94,6 +94,20 @@ export const useEnrollment = (courseId: string) => {
     }
   }, [user, courseId]);
 
+  const cancelEnrollment = useCallback(async (enrollmentId: string) => {
+    try {
+      const enrollmentRef = doc(db, 'enrollments', enrollmentId);
+      await updateDoc(enrollmentRef, {
+        status: 'cancelled',
+        cancelledAt: Timestamp.now()
+      });
+      return true;
+    } catch (err) {
+      console.error('Error cancelling enrollment:', err);
+      throw err;
+    }
+  }, []);
+
   useEffect(() => {
     checkEnrollment();
   }, [checkEnrollment]);
@@ -103,6 +117,7 @@ export const useEnrollment = (courseId: string) => {
     enrollment,
     loading,
     error,
-    getUserEnrollments
+    getUserEnrollments,
+    cancelEnrollment
   };
 };

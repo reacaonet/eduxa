@@ -23,7 +23,7 @@ interface EnrolledCourse {
 
 export default function StudentDashboard() {
   const { user } = useAuth();
-  const { getUserEnrollments } = useEnrollment('');
+  const { getUserEnrollments, cancelEnrollment } = useEnrollment('');
   const { getCourseById } = useCourses();
   const { profile } = useProfile();
   const [enrolledCourses, setEnrolledCourses] = useState<EnrolledCourse[]>([]);
@@ -97,6 +97,19 @@ export default function StudentDashboard() {
     const totalProgress = enrolledCourses.reduce((acc, course) => acc + course.progress, 0);
     return Math.round(totalProgress / enrolledCourses.length);
   }, [enrolledCourses]); // Memoize a função que depende de enrolledCourses
+
+  const handleCancelEnrollment = useCallback(async (enrollmentId: string, courseTitle: string) => {
+    if (window.confirm(`Tem certeza que deseja cancelar sua matrícula no curso "${courseTitle}"?`)) {
+      try {
+        await cancelEnrollment(enrollmentId);
+        // Recarregar os dados após o cancelamento
+        loadStudentData();
+      } catch (error) {
+        console.error('Error cancelling enrollment:', error);
+        alert('Erro ao cancelar matrícula. Por favor, tente novamente.');
+      }
+    }
+  }, [cancelEnrollment, loadStudentData]);
 
   if (!user || loading) {
     return (
@@ -193,12 +206,22 @@ export default function StudentDashboard() {
                       <p>{course.progress}% completo</p>
                       <p>{course.completedLessons.length}/{course.totalLessons} aulas concluídas</p>
                     </div>
-                    <Button 
-                      className="w-full" 
-                      onClick={() => navigate(`/course/${course.id}/learn`)}
-                    >
-                      Continuar
-                    </Button>
+                    <div className="flex gap-2 mt-4">
+                      <Button 
+                        className="flex-1" 
+                        onClick={() => navigate(`/course/${course.id}/learn`)}
+                      >
+                        Continuar
+                      </Button>
+                      <Button 
+                        variant="destructive"
+                        size="icon"
+                        onClick={() => handleCancelEnrollment(course.enrollmentId, course.title)}
+                        title="Cancelar matrícula"
+                      >
+                        ✕
+                      </Button>
+                    </div>
                   </div>
                 </Card>
               ))}
